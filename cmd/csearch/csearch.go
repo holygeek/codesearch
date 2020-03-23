@@ -15,7 +15,7 @@ import (
 	"github.com/google/codesearch/regexp"
 )
 
-var usageMessage = `usage: csearch [-c] [-f fileregexp] [-h] [-i] [-l] [-n] regexp
+var usageMessage = `usage: csearch [-c] [-e fileregexp] [-f fileregexp] [-h] [-i] [-l] [-n] regexp
 
 Csearch behaves like grep over all indexed files, searching for regexp,
 an RE2 (nearly PCRE) regular expression.
@@ -25,6 +25,9 @@ flag parsing convention, they cannot be combined: the option pair -i -n
 cannot be abbreviated to -in.
 
 The -f flag restricts the search to files whose names match the RE2 regular
+expression fileregexp.
+
+The -e flag retricts the search to files whose names do not match the RE2 regular
 expression fileregexp.
 
 Csearch relies on the existence of an up-to-date index created ahead of time.
@@ -47,6 +50,7 @@ func usage() {
 
 var (
 	fFlag       = flag.String("f", "", "search only files with names matching this regexp")
+	eFlag       = flag.String("e", "", "exclude files with names matching this regexp")
 	iFlag       = flag.Bool("i", false, "case-insensitive search")
 	verboseFlag = flag.Bool("verbose", false, "print extra information")
 	bruteFlag   = flag.Bool("brute", false, "brute force - search all files in index")
@@ -96,6 +100,13 @@ func Main() {
 			log.Fatal(err)
 		}
 	}
+	var efre *regexp.Regexp
+	if *eFlag != "" {
+		efre, err = regexp.Compile(*eFlag)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	q := index.RegexpQuery(re.Syntax)
 	if *verboseFlag {
 		log.Printf("query: %s\n", q)
@@ -113,12 +124,15 @@ func Main() {
 		log.Printf("post query identified %d possible files\n", len(post))
 	}
 
-	if fre != nil {
+	if fre != nil || efre != nil {
 		fnames := make([]uint32, 0, len(post))
 
 		for _, fileid := range post {
 			name := ix.Name(fileid)
-			if fre.MatchString(name, true, true) < 0 {
+			if fre != nil && fre.MatchString(name, true, true) < 0 {
+				continue
+			}
+			if efre != nil && efre.MatchString(name, true, true) >= 0 {
 				continue
 			}
 			fnames = append(fnames, fileid)
