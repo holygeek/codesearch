@@ -16,7 +16,7 @@ import (
 	"github.com/google/codesearch/index"
 )
 
-var usageMessage = `usage: cindex [-list] [-reset] [path...]
+var usageMessage = `usage: cindex [-list] [-reset] [-logskip] [path...]
 
 Cindex prepares the trigram index for use by csearch.  The index is the
 file named by $CSEARCHINDEX, or else $HOME/.csearchindex.
@@ -41,6 +41,9 @@ itself is a useful command to run in a nightly cron job.
 
 The -list flag causes cindex to list the paths it has indexed and exit.
 
+The -logskip flag causes cindex to list skipped files due to various
+reasons.
+
 By default cindex adds the named paths to the index but preserves 
 information about other paths that might already be indexed
 (the ones printed by cindex -list).  The -reset flag causes cindex to
@@ -57,6 +60,7 @@ var (
 	listFlag    = flag.Bool("list", false, "list indexed paths and exit")
 	resetFlag   = flag.Bool("reset", false, "discard existing index")
 	verboseFlag = flag.Bool("verbose", false, "print extra information")
+	logSkipFlag = flag.Bool("logskip", false, "print skipped files")
 	cpuProfile  = flag.String("cpuprofile", "", "write cpu profile to this file")
 )
 
@@ -123,6 +127,7 @@ func main() {
 
 	ix := index.Create(file)
 	ix.Verbose = *verboseFlag
+	ix.LogSkip = *logSkipFlag
 	ix.AddPaths(args)
 	for _, arg := range args {
 		log.Printf("index %s", arg)
