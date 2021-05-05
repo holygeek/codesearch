@@ -10,13 +10,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/pprof"
 	"sort"
 
 	"github.com/google/codesearch/index"
 )
 
-var usageMessage = `usage: cindex [-list] [-reset] [-logskip] [path...]
+var usageMessage = `usage: cindex [-list] [-reset] [-logskip] [-exclude <regex>] [path...]
 
 Cindex prepares the trigram index for use by csearch.  The index is the
 file named by $CSEARCHINDEX, or else $HOME/.csearchindex.
@@ -44,6 +45,8 @@ The -list flag causes cindex to list the paths it has indexed and exit.
 The -logskip flag causes cindex to list skipped files due to various
 reasons.
 
+Use -exclude <regex> to exclude files whose names matches the given <regex>.
+
 By default cindex adds the named paths to the index but preserves 
 information about other paths that might already be indexed
 (the ones printed by cindex -list).  The -reset flag causes cindex to
@@ -57,11 +60,12 @@ func usage() {
 }
 
 var (
-	listFlag    = flag.Bool("list", false, "list indexed paths and exit")
-	resetFlag   = flag.Bool("reset", false, "discard existing index")
-	verboseFlag = flag.Bool("verbose", false, "print extra information")
-	logSkipFlag = flag.Bool("logskip", false, "print skipped files")
-	cpuProfile  = flag.String("cpuprofile", "", "write cpu profile to this file")
+	listFlag      = flag.Bool("list", false, "list indexed paths and exit")
+	resetFlag     = flag.Bool("reset", false, "discard existing index")
+	verboseFlag   = flag.Bool("verbose", false, "print extra information")
+	logSkipFlag   = flag.Bool("logskip", false, "print skipped files")
+	cpuProfile    = flag.String("cpuprofile", "", "write cpu profile to this file")
+	excludeReFlag = flag.String("exclude", "", "exclude files whose name matches the regex")
 )
 
 func main() {
@@ -125,6 +129,11 @@ func main() {
 		file += "~"
 	}
 
+	var excludeRe *regexp.Regexp
+	if *excludeReFlag != "" {
+		excludeRe = regexp.MustCompile(*excludeReFlag)
+	}
+
 	ix := index.Create(file)
 	ix.Verbose = *verboseFlag
 	ix.LogSkip = *logSkipFlag
@@ -146,7 +155,9 @@ func main() {
 				return nil
 			}
 			if info != nil && info.Mode()&os.ModeType == 0 {
-				ix.AddFile(path)
+				if excludeRe == nil || !excludeRe.MatchString(path) {
+					ix.AddFile(path)
+				}
 			}
 			return nil
 		})
